@@ -1,0 +1,19 @@
+[2026-08-23T01:00:01.571+0000] {local_task_job_runner.py:123} INFO - ::group::Pre task execution logs
+[2026-08-23T01:00:01.587+0000] {taskinstance.py:2614} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: weekly_segment.weekly_safety_stock manual__2026-08-23T01:00:00+00:00 [queued]>
+[2026-08-23T01:00:01.594+0000] {taskinstance.py:2614} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: weekly_segment.weekly_safety_stock manual__2026-08-23T01:00:00+00:00 [queued]>
+[2026-08-23T01:00:01.595+0000] {taskinstance.py:2867} INFO - Starting attempt 1 of 3
+[2026-08-23T01:00:01.603+0000] {taskinstance.py:2890} INFO - Executing <Task(PythonOperator): weekly_safety_stock> on 2026-08-23 01:00:00+00:00
+[2026-08-23T01:00:01.609+0000] {standard_task_runner.py:104} INFO - Running: ['***', 'tasks', 'run', 'weekly_segment', 'weekly_safety_stock', 'manual__2026-08-23T01:00:00+00:00', '--job-id', '14', '--raw', '--subdir', 'DAGS_FOLDER/weekly_segment.py', '--cfg-path', '/tmp/tmp9vpd89go']
+[2026-08-23T01:00:01.610+0000] {logging_mixin.py:190} WARNING - /home/***/.local/lib/python3.12/site-packages/***/task/task_runner/standard_task_runner.py:70 DeprecationWarning: This process (pid=491) is multi-threaded, use of fork() may lead to deadlocks in the child.
+[2026-08-23T01:00:01.611+0000] {standard_task_runner.py:105} INFO - Job 14: Subtask weekly_safety_stock
+[2026-08-23T01:00:01.612+0000] {standard_task_runner.py:72} INFO - Started process 492 to run task
+[2026-08-23T01:00:01.656+0000] {task_command.py:467} INFO - Running <TaskInstance: weekly_segment.weekly_safety_stock manual__2026-08-23T01:00:00+00:00 [running]> on host f9daaaed41ec
+[2026-08-23T01:00:01.715+0000] {taskinstance.py:3134} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='data-eng' AIRFLOW_CTX_DAG_ID='weekly_segment' AIRFLOW_CTX_TASK_ID='weekly_safety_stock' AIRFLOW_CTX_EXECUTION_DATE='2026-08-23T01:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-08-23T01:00:00+00:00'
+[2026-08-23T01:00:01.716+0000] {taskinstance.py:732} INFO - ::endgroup::
+[2026-08-23T01:00:01.819+0000] {logging_mixin.py:190} INFO - [safety_stock] 2026-08-23 16 items
+[2026-08-23T01:00:01.820+0000] {python.py:240} INFO - Done. Returned value was: 16
+[2026-08-23T01:00:01.839+0000] {taskinstance.py:341} INFO - ::group::Post task execution logs
+[2026-08-23T01:00:01.839+0000] {taskinstance.py:353} INFO - Marking task as SUCCESS. dag_id=weekly_segment, task_id=weekly_safety_stock, run_id=manual__2026-08-23T01:00:00+00:00, execution_date=20260823T010000, start_date=20260823T010001, end_date=20260823T010001
+[2026-08-23T01:00:01.867+0000] {local_task_job_runner.py:266} INFO - Task exited with return code 0
+[2026-08-23T01:00:01.880+0000] {taskinstance.py:3901} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2026-08-23T01:00:01.883+0000] {local_task_job_runner.py:245} INFO - ::endgroup::

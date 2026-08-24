@@ -1,0 +1,82 @@
+# Airflow 本番用 Docker Compose
+# webserver / scheduler / メタDB(postgres) の最小構成 (LocalExecutor)
+# ホストの sample/src・jobs・dags をマウントし、在庫DB(ホスト)へ接続する。
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.10.5
+  environment:
+    &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    # 開発用固定 FERNET_KEY(32byte base64)。本番は秘密管理から注入する。
+    AIRFLOW__CORE__FERNET_KEY: '82vIl2Q7DCfIepNJ9NKBe1Ee9LThL2QNH_uHLNhqHSo='
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Tokyo
+    # 在庫DB(ホストの PostgreSQL) への接続
+    DB_HOST: host.docker.internal
+    DB_PORT: "5432"
+    DB_NAME: keio_inventory
+    DB_USER: postgres
+    DB_PASSWORD: postgres
+    # src を import 可能にする(仕事 jobs.tasks)
+    PYTHONPATH: /opt/airflow/jobs:/opt/airflow/src
+    # 在庫計算に必要な追加パッケージ(起動時にインストール)
+    # 注意: sqlalchemy は Airflow 同梱のバージョンを使う(上書きしない)。
+    #       固定すると Airflow 本体の ORM が壊れて起動に失敗する。
+    _PIP_ADDITIONAL_REQUIREMENTS: >-
+      psycopg2-binary==2.9.12
+      numpy==2.5.2
+      pandas==3.0.5
+      scipy==1.18.1
+  volumes:
+    - ../dags:/opt/airflow/dags
+    - ../jobs:/opt/airflow/jobs
+    - ../src:/opt/airflow/src
+    - ../logs:/opt/airflow/logs
+  depends_on:
+    - postgres
+  networks:
+    - airflow-net
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - airflow-net
+
+  scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: on-failure
+
+  webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+
+volumes:
+  postgres-db-volume:
+
+networks:
+  airflow-net:
