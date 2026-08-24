@@ -3,7 +3,7 @@ services:
     name: keio-inventory-demo
     runtime: python
     plan: free
-    rootDir: sample
+    rootDir: .
     buildCommand: pip install -r prod_requirements.txt
     startCommand: bash start.sh
     autoDeploy: false
