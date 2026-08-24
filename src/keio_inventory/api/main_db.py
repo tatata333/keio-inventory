@@ -350,7 +350,9 @@ def dashboard_html():
 
 _DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="ja">
-<head><meta charset="utf-8">
+<head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ec008c'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white'>在</text></svg>">
+  <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>在庫最適化 ダッシュボード</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
