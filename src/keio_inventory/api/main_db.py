@@ -390,7 +390,7 @@ h1{font-size:22px;font-weight:600;margin-bottom:4px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
 .panel h2{font-size:15px;font-weight:600;margin-bottom:12px}
-.panel .chartWrap{position:relative;height:260px}
+.panel .chartWrap{position:relative;width:100%;overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
 th{color:var(--muted);font-weight:500}
@@ -1317,7 +1317,7 @@ async function loadHistory(){
         { label:'回転率(年近似)', data: items.map(function(x){return x.inventory_turnover_annual}), borderColor:'#5b78b8', backgroundColor:'#5b78b8', yAxisID:'y1', tension:0.3, dashed:true }
       ]
     }, options:{
-      responsive:true,
+      responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ labels:{ color:'#eef2f8' } } },
       scales:{
         x:{ ticks:{ color:'#9fb0cc' }, grid:{ color:'#2a3a5e' } },
@@ -1367,7 +1367,7 @@ async function loadForecastCompare(){
         { label:"予測P95", data: s.map(function(x){return x.forecast_p95}), borderColor:"rgba(236,0,140,0.25)", backgroundColor:"rgba(236,0,140,0.08)", pointRadius:0 }
       ]
     }, options:{
-      responsive:true,
+      responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ labels:{ color:"#eef2f8" } } },
       scales:{ x:{ ticks:{ color:"#9fb0cc" }, grid:{ color:"#2a3a5e" } }, y:{ ticks:{ color:"#9fb0cc" }, grid:{ color:"#2a3a5e" } } }
     }});
