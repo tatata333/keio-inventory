@@ -1186,7 +1186,7 @@ async function loadAlerts(){
       // 状態を日本語表示（open=未対応 / ack=対応中 / done=解決済み）
       var ST_JP = {open:'未対応', ack:'対応中', done:'解決済み'};
       var stTxt = ST_JP[a.status] || a.status;
-      var stBadge = a.status==='done' ? '<span class="pill ok">解決済み</span>' : '<span class="pill '+(a.status==='ack'?'pending':'open')+'">'+stTxt+'</span>';
+      var stBadge = a.status==='done' ? '<span class="pill ok">解決済み</span>' : '<span class="pill '+(a.status==='ack'?'ok':'open')+'">'+stTxt+'</span>';
       return '<tr data-place="'+apn+'" style="cursor:pointer;border-left:3px solid '+sc+'" onclick="showAlertDetail('+a.id+')">' +
         '<td>'+a.product_name+'</td><td>'+apn+'</td><td>'+jp+'</td>' +
         '<td style="color:'+sc+';font-weight:600">'+(SEV_JP[a.severity]||a.severity)+'</td>' +
