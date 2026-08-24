@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ログ・ランタイム
+logs/
+*.log
+airflow.cfg
+
+# デモDB（SQLite）
+*.db
+*.sqlite3
+
+# 一時・キャッシュ
+.playwright-mcp/
+.DS_Store
+Thumbs.db
+
+# 環境・機密
+.env
+.env.*
+
+# ビルド
+build/
+dist/
