@@ -451,6 +451,16 @@ th{color:var(--muted);font-weight:500}
 button.act-btn{background:#141c2e;color:#eef2f8;border:1px solid #2a3a5e;padding:3px 10px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px}
 button.act-btn.approve{background:#0f5132;border-color:#198754;color:#fff}
 button.act-btn.reject{background:#842029;border-color:#dc3545;color:#fff}
+button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
+/* 調整発注量 ポップ（モーダル） */
+#adjust-overlay{display:none;position:fixed;inset:0;background:rgba(5,9,16,.62);z-index:998}
+#adjust-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(340px,90vw);background:#0d1521;border:1px solid #2a3a5e;border-radius:12px;
+  padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.6);z-index:999}
+#adjust-modal .modal-close{width:28px;height:28px;border-radius:50%;background:#1b2a4a;border:1px solid #2a3a5e;
+  color:#9fb0cc;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#adjust-modal .modal-close:hover{background:#2a3a5e;color:#fff}
+#adjust-modal input{border:1px solid #2a3a5e;background:#141c2e;color:#eef2f8;padding:8px;border-radius:6px;font-size:14px;width:100%;box-sizing:border-box}
 @media(max-width:820px){.row{grid-template-columns:1fr}}
 </style></head>
 <body>
@@ -559,6 +569,21 @@ button.act-btn.reject{background:#842029;border-color:#dc3545;color:#fff}
     <!-- アラート詳細 モーダル（商品リストの上に被せる。背景グレーアウト付き） -->
 <div id="alert-overlay" onclick="alClose()"></div>
 <div id="alert-detail" role="dialog" aria-modal="true"></div>
+
+<!-- 推奨発注 調整 モーダル（発注量の数値調整） -->
+<div id="adjust-overlay" onclick="closeAdjustModal()"></div>
+<div id="adjust-modal" role="dialog" aria-modal="true">
+  <div class="modal-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #22304a">
+    <div><b style="font-size:15px">発注量の調整</b><br><span id="adj-name" style="color:var(--muted);font-size:12px"></span></div>
+    <button class="modal-close" onclick="closeAdjustModal()" title="閉じる">✕</button>
+  </div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:8px">推奨発注量: <b id="adj-current" style="color:#ec008c"></b></div>
+  <input type="number" id="adj-input" min="0" placeholder="調整後の発注量を入力">
+  <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+    <button class="act-btn" onclick="closeAdjustModal()">キャンセル</button>
+    <button class="act-btn adjust" onclick="submitAdjust()">調整する</button>
+  </div>
+</div>
   </div>
 
   <!-- 販売不振タブ -->
@@ -1079,10 +1104,9 @@ async function loadRecs(){
       // 状態バッジ（日本語表示: 未処理/承認済/調整済/却下）
       var ST_REC_JP = {pending:'未処理', approved:'承認済', adjusted:'調整済', rejected:'却下'};
       var stPill = '<span class="pill '+stClass2(it.status)+'">'+(ST_REC_JP[it.status]||it.status)+'</span>';
-      // 操作（未処理→調整/承認/却下。調整は発注量を数値で変更して確定）
+      // 操作（未処理→調整/承認/却下。調整はポップアップで数値入力）
       var adjUi = (it.status==='pending')
-        ? '<input type="number" id="adj-qty-'+it.id+'" value="'+qty+'" min="0" style="width:62px;background:#141c2e;color:#eef2f8;border:1px solid #2a3a5e;padding:3px 4px;border-radius:4px;font-size:12px;margin-right:4px" title="調整後の発注量">'
-          + '<button class="act-btn" onclick="adjustRec('+it.id+')">調整</button> '
+        ? '<button class="act-btn adjust" onclick="openAdjustModal('+it.id+','+qty+')">調整</button> '
         : '';
       var btnAct = (it.status==='pending'||it.status==='adjusted')
         ? adjUi
@@ -1118,12 +1142,35 @@ async function approveRec(id){
 async function rejectRec(id){
   await fetch('/api/v1/order/recommendation/' + id + '/reject', {method:'POST'}); loadRecs();
 }
-async function adjustRec(id){
-  var inp = document.getElementById('adj-qty-' + id);
-  var qty = inp ? Number(inp.value) : null;
-  if(inp && (isNaN(qty) || qty < 0)){ alert('発注量を0以上の数値で入力してください'); return; }
-  var url = '/api/v1/order/recommendation/' + id + '/adjust' + (qty!=null ? ('?qty=' + qty) : '');
-  await fetch(url, {method:'POST'}); loadRecs();
+// 調整 モーダルの状態
+var _adjId = null;
+function openAdjustModal(id, currentQty){
+  _adjId = id;
+  // REC_ITEMS から該当商品の名前・店舗を導出
+  var itm = null;
+  for(var i=0;i<REC_ITEMS.length;i++){ if(REC_ITEMS[i].id === id){ itm = REC_ITEMS[i]; break; } }
+  var label = itm ? ((itm.product_name||'商品'+itm.product_id) + ' × ' + (itm.place_name||('店舗'+itm.place_id))) : ('商品' + id);
+  document.getElementById('adj-name').textContent = label;
+  document.getElementById('adj-current').textContent = currentQty != null ? Number(currentQty).toLocaleString() : '-';
+  var inp = document.getElementById('adj-input');
+  inp.value = currentQty != null ? currentQty : '';
+  document.getElementById('adjust-overlay').style.display = 'block';
+  document.getElementById('adjust-modal').style.display = 'block';
+  inp.focus(); inp.select();
+}
+function closeAdjustModal(){
+  document.getElementById('adjust-overlay').style.display = 'none';
+  document.getElementById('adjust-modal').style.display = 'none';
+  _adjId = null;
+}
+async function submitAdjust(){
+  if(_adjId == null) return;
+  var inp = document.getElementById('adj-input');
+  var qty = Number(inp.value);
+  if(isNaN(qty) || qty < 0){ alert('発注量を0以上の数値で入力してください'); return; }
+  await fetch('/api/v1/order/recommendation/' + _adjId + '/adjust?qty=' + qty, {method:'POST'});
+  closeAdjustModal();
+  loadRecs();
 }
 async function approveProduct(pid){
   var ids = REC_ITEMS.filter(function(x){return x.product_id===pid;}).map(function(x){return x.id;});
