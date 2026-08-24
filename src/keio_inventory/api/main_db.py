@@ -136,6 +136,17 @@ def reject(item_id: int, db: Session = Depends(get_session)):
     return {"status": "rejected"}
 
 
+@app.post("/api/v1/order/recommendation/{item_id}/adjust")
+def adjust(item_id: int, qty: float | None = Query(default=None), db: Session = Depends(get_session)):
+    """推奨発注量を担当者が調整して「調整済み」状態にする（FR-6-2）。"""
+    pid, plid = divmod(item_id, 100)
+    repo = _repo(db)
+    ok = repo.update_rec_status(pid, plid, DATE, "adjusted", qty=qty)
+    if not ok:
+        raise HTTPException(404, "recommendation not found")
+    return {"status": "adjusted", "recommended_qty": qty}
+
+
 @app.get("/api/v1/anomaly/alerts")
 def alerts(status: str | None = None, severity: str | None = None,
            anomaly_type: str | None = None, db: Session = Depends(get_session)):
@@ -1068,9 +1079,14 @@ async function loadRecs(){
       // 状態バッジ（日本語表示: 未処理/承認済/調整済/却下）
       var ST_REC_JP = {pending:'未処理', approved:'承認済', adjusted:'調整済', rejected:'却下'};
       var stPill = '<span class="pill '+stClass2(it.status)+'">'+(ST_REC_JP[it.status]||it.status)+'</span>';
-      // 操作（未処理のみ）
+      // 操作（未処理→調整/承認/却下。調整は発注量を数値で変更して確定）
+      var adjUi = (it.status==='pending')
+        ? '<input type="number" id="adj-qty-'+it.id+'" value="'+qty+'" min="0" style="width:62px;background:#141c2e;color:#eef2f8;border:1px solid #2a3a5e;padding:3px 4px;border-radius:4px;font-size:12px;margin-right:4px" title="調整後の発注量">'
+          + '<button class="act-btn" onclick="adjustRec('+it.id+')">調整</button> '
+        : '';
       var btnAct = (it.status==='pending'||it.status==='adjusted')
-        ? '<button class="act-btn approve" onclick="approveRec('+it.id+')">承認</button>'
+        ? adjUi
+          + '<button class="act-btn approve" onclick="approveRec('+it.id+')">承認</button>'
           + '<button class="act-btn reject" onclick="rejectRec('+it.id+')">却下</button>'
         : '';
       html += '<tr data-place="'+place+'" style="min-height:44px;'+grpBg.slice(grpBg?grpBg.indexOf('background'):-1)+'">' +
@@ -1101,6 +1117,13 @@ async function approveRec(id){
 }
 async function rejectRec(id){
   await fetch('/api/v1/order/recommendation/' + id + '/reject', {method:'POST'}); loadRecs();
+}
+async function adjustRec(id){
+  var inp = document.getElementById('adj-qty-' + id);
+  var qty = inp ? Number(inp.value) : null;
+  if(inp && (isNaN(qty) || qty < 0)){ alert('発注量を0以上の数値で入力してください'); return; }
+  var url = '/api/v1/order/recommendation/' + id + '/adjust' + (qty!=null ? ('?qty=' + qty) : '');
+  await fetch(url, {method:'POST'}); loadRecs();
 }
 async function approveProduct(pid){
   var ids = REC_ITEMS.filter(function(x){return x.product_id===pid;}).map(function(x){return x.id;});
