@@ -425,16 +425,16 @@ th{color:var(--muted);font-weight:500}
 .detail-compare .cmp-bad{color:#dc2626;font-weight:600}
 /* ---- アラート詳細 モーダル ---- */
 #alert-overlay{display:none;position:fixed;inset:0;background:rgba(5,9,16,.62);z-index:998;backdrop-filter:blur(2px)}
-#alert-detail{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+#alert-detail,#exclusion-detail{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:min(560px,92vw);max-height:85vh;overflow-y:auto;
   background:#0d1521;border:1px solid #2a3a5e;border-radius:12px;
   padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.6);z-index:999}
-#alert-detail .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #22304a}
-#alert-detail .modal-close{flex-shrink:0;width:28px;height:28px;border-radius:50%;
+#alert-detail .modal-head,#exclusion-detail .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #22304a}
+#alert-detail .modal-close,#exclusion-detail .modal-close{flex-shrink:0;width:28px;height:28px;border-radius:50%;
   background:#1b2a4a;border:1px solid #2a3a5e;color:#9fb0cc;font-size:15px;line-height:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
-#alert-detail .modal-close:hover{background:#2a3a5e;color:#fff}
-#alert-detail table{margin-top:4px}
+#alert-detail .modal-close:hover,#exclusion-detail .modal-close:hover{background:#2a3a5e;color:#fff}
+#alert-detail table,#exclusion-detail table{margin-top:4px}
 .tab-btn{background:transparent;border:none;color:var(--muted);padding:8px 16px;font-size:14px;cursor:pointer;border-bottom:2px solid transparent}
 .tab-btn.active{color:var(--pink);border-bottom:2px solid var(--pink);font-weight:600}
 button.act-btn{background:#141c2e;color:#eef2f8;border:1px solid #2a3a5e;padding:3px 10px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px}
@@ -553,7 +553,8 @@ button.act-btn.reject{background:#842029;border-color:#dc3545;color:#fff}
   <!-- 販売不振タブ -->
   <div id="tab-exclusion" class="tab-body" style="display:none">
     <div style="max-height:320px;overflow-y:auto"><table style="width:100%"><thead><tr><th>商品</th><th>店舗</th><th>ABC/XYZ</th><th>販売数</th><th>在庫</th><th>スコア(/100)</th><th>リスク</th></tr></thead><tbody id="exclusion-tbody"></tbody></table></div>
-    <div id="exclusion-detail" style="margin-top:10px;display:none;background:#0a1018;padding:10px;border-radius:8px"></div>
+    <!-- 販売不振詳細 モーダル（アラートと同様・#alert-overlay 共用） -->
+    <div id="exclusion-detail" role="dialog" aria-modal="true"></div>
   </div>
 </div>
 
@@ -1133,12 +1134,27 @@ async function loadExclusionDetail(pid){
     const r = await fetch('/api/v1/exclusion/' + pid);
     const it = await r.json();
     const demand = it.recent_demand ? it.recent_demand.slice(-14).map(function(x){return x.qty}).join(', ') : '-';
+    // 異常アラートと同様のモーダル表示（#alert-overlay 共用）
+    document.getElementById('alert-overlay').style.display='block';
     d.style.display='block';
-    d.innerHTML = '<b>' + it.name + '</b>（' + it.abcx + '）スコア ' + it.score + '/100 [' + it.risk + ']<br>' +
-      '販売数: ' + Math.round(it.sales_count) + ' / 売上: ' + Math.round(it.sales_amount) + ' / 在庫: ' + Math.round(it.on_hand) + '<br>' +
-      '不振理由: ' + (it.reasons||[]).join('、') + '<br>' +
-      '直近需要: <span style="color:#ec008c">' + demand + '</span>';
-  }catch(e){ d.style.display='block'; d.innerHTML='詳細取得エラー'; }
+    var riskColor = it.risk==='撤退候補' ? '#ef4444' : (it.risk==='要注意' ? '#f97316' : '#16a34a');
+    d.innerHTML =
+      '<div class="modal-head">' +
+        '<div><b style="font-size:16px">' + it.name + '</b> <span style="color:var(--muted)">(' + it.abcx + ')</span></div>' +
+        '<button class="modal-close" onclick="exclusionClose()" title="閉じる">✕</button>' +
+      '</div>' +
+      '<table style="width:100%;font-size:13px;border-collapse:collapse"><tbody>' +
+        '<tr><td style="padding:5px 0;color:var(--muted);width:110px">リスク</td><td><b style="color:'+riskColor+'">'+it.risk+'</b>（スコア '+it.score+'/100）</td></tr>' +
+        '<tr><td style="padding:5px 0;color:var(--muted)">販売数 / 売上</td><td>'+Math.round(it.sales_count)+' 個 / '+Math.round(it.sales_amount)+' 円</td></tr>' +
+        '<tr><td style="padding:5px 0;color:var(--muted)">現在在庫</td><td>'+Math.round(it.on_hand)+' 個</td></tr>' +
+        '<tr><td style="padding:5px 0;color:var(--muted)">不振理由</td><td>'+(it.reasons||[]).join('、')+'</td></tr>' +
+        '<tr><td style="padding:5px 0;color:var(--muted)">直近14日需要</td><td><span style="color:#ec008c">'+demand+'</span></td></tr>' +
+      '</tbody></table>';
+  }catch(e){ document.getElementById('alert-overlay').style.display='block'; d.style.display='block'; d.innerHTML='<div class="modal-head"><div>詳細取得エラー</div><button class="modal-close" onclick="exclusionClose()">✕</button></div>'; }
+}
+function exclusionClose(){
+  var ov = document.getElementById('alert-overlay'); if(ov) ov.style.display='none';
+  var d = document.getElementById('exclusion-detail'); if(d) d.style.display='none';
 }
 
 
@@ -1260,6 +1276,7 @@ async function showAlertDetail(id){
 function alClose(){
   var ov = document.getElementById('alert-overlay'); if(ov) ov.style.display='none';
   var d2 = document.getElementById('alert-detail'); if(d2) d2.style.display='none';
+  var de = document.getElementById('exclusion-detail'); if(de) de.style.display='none';
 }
 function openAlertDetail(id){ switchList('alert'); showAlertDetail(id); }
 
