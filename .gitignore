@@ -25,3 +25,10 @@ Thumbs.db
 # ビルド
 build/
 dist/
+
+# 一時チェック用ファイル
+_tmp_*.js
+_tmp_*.py
+_tmp_*.txt
+_seed*.txt
+_pipe*.txt
