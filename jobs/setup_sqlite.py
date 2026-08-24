@@ -76,4 +76,7 @@ if __name__ == "__main__":
     from jobs.run_pipeline_db import main as run_main
     seed_main()
     run_main()
-    print("[+] SQLite デモDB 構築完了")
+    # 時系列トレンド用のバックフィル（過去90日分）を生成（グラフ「在庫指標の時系列」表示用）
+    from jobs.seed_history_backfill import backfill as do_backfill
+    do_backfill(days=90)
+    print("[+] SQLite デモDB 構築完了（時系列 90日分 バックフィル込み）")
