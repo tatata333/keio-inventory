@@ -23,6 +23,56 @@ def _repo(db: Session) -> InventoryRepository:
     return InventoryRepository(db)
 
 
+# ---- モバイル端末からのアクセスを「PCでご覧ください」画面へ誘導する（営業用・操作はPC前提） ----
+_PC_HINT_HTML = """<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCでのご覧を推奨しています</title>
+<style>
+  :root{--bg:#0a1018;--card:#141c2e;--line:#2a3a5e;--txt:#eef2f8;--muted:#9fb0cc;--pink:#ec008c;--pink-soft:#ff9ecb}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 24px;max-width:400px;width:100%;text-align:center}
+  .p{color:var(--pink);font-size:40px;line-height:1;margin-bottom:12px}
+  h1{font-size:18px;font-weight:600;line-height:1.5}
+  p{font-size:13px;color:var(--muted);line-height:1.8;margin-top:16px}
+  .btn{display:inline-block;margin-top:22px;background:var(--pink);color:#fff;border:none;padding:12px 22px;border-radius:8px;font-size:14px;text-decoration:none;width:100%}
+  .sub{font-size:11px;color:var(--muted);margin-top:14px}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="p">◆</div>
+    <h1>PCでご覧ください</h1>
+    <p>このデモは、在庫ダッシュボードの操作・確認を
+      パソコン（PC）の大きな画面でご覧いただくことを想定しております。<br>
+      お手数ですが、<b>パソコンからアクセス</b>をお願いいたします。</p>
+    <a class="btn" href="https://keio-inventory.onrender.com/">アクセス URL はこちら</a>
+    <div class="sub">https://keio-inventory.onrender.com/</div>
+  </div>
+</body>
+</html>
+"""
+
+
+def _is_mobile(request) -> bool:
+    import re as _re
+    ua = request.headers.get("user-agent", "")
+    return bool(_re.search(r"Mobi|Android|iPhone|iPad|iPod|Samsung|BlackBerry|IEMobile|Opera Mini", ua))
+
+
+@app.middleware("http")
+async def _mobile_redirect(request, call_next):
+    from starlette.responses import HTMLResponse
+    path = request.url.path
+    # HTMLページ（ダッシュボード本体）へのアクセスで、モバイル端末なら誘導画面に差し替える
+    if path in ("/", "/dashboard") and _is_mobile(request):
+        return HTMLResponse(content=_PC_HINT_HTML, status_code=200)
+    return await call_next(request)
+
+
 @app.get("/api/v1/health")
 def health(db: Session = Depends(get_session)):
     from keio_inventory.infra.db.session import engine as _eng
