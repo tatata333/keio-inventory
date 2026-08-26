@@ -62,6 +62,8 @@ class AnomalyService:
         annual_turnover: float | None = None,
         days_on_hand: float | None = None,
         segment: str = "BX",
+        lead_time_days: float | None = None,
+        forecast_demand: float | None = None,
     ) -> list[AnomalyResult]:
         out: list[AnomalyResult] = []
         arr = np.asarray(daily_demand, dtype=float)
@@ -100,13 +102,49 @@ class AnomalyService:
                 "在庫削減・仕入停止・値引き",
             ))
 
-        # --- abnormal turnover (MAD robust bounds) ---
-        if on_hand is not None and arr.size >= 14:
-            lo, hi = _mad_based_bounds([float(x) for x in arr], self.abnormal_mad_k)
-            if on_hand < lo or on_hand > hi:
+        # --- 在庫過不足の判定（リードタイム需要ベース） ---
+        # 実務に沿って「この在庫でリードタイム中の需要を賄えるか」で欠品/過剰を区別する。
+        # MADで日次需要のばらつきから境界を出すと、リードタイム前の在庫が
+        # 「過剰」に見えてしまい欠品を見逃すため、ここでは需要×リードタイム と比較する。
+        if on_hand is not None and arr.size >= 3:
+            avg_daily = float(arr.mean())
+            lt = float(lead_time_days or 0.0)
+            # 必要量は「将来予測のリードタイム合計」が渡されればそれを優先（推奨発注と整合）。
+            # 無ければ過去日次需要×リードタイムで概算。
+            lt_need = float(forecast_demand) if forecast_demand is not None else (avg_daily * lt)
+            days_cover = (on_hand / avg_daily) if avg_daily > 0 else float('inf')
+            if lt_need > 0 and on_hand < lt_need:
+                # ---- 欠品リスク（在庫 < リードタイム需要） ----
+                if on_hand <= 0:
+                    sev = "critical"
+                    action = "欠品発生中・緊急補充"
+                    pos = "stockout"
+                elif on_hand < lt_need * 0.5:
+                    sev = "critical" if segment[0] == "A" else "high"
+                    action = "補充発注・欠品防止（在庫不足）"
+                    pos = "stockout"
+                else:
+                    sev = "high" if segment[0] == "A" else "medium"
+                    action = "補充発注・欠品防止（在庫不足）"
+                    pos = "stockout"
                 out.append(AnomalyResult(
-                    product_id, place_id, "abnormal_turnover", "low",
-                    {"on_hand": on_hand, "lower": round(lo, 2), "upper": round(hi, 2)},
-                    "棚卸確認・運用点検",
+                    product_id, place_id, "abnormal_turnover", sev,
+                    {"on_hand": round(on_hand, 2), "lower": round(lt_need, 2),
+                     "upper": round(lt_need * 2.0, 2), "avg_daily": round(avg_daily, 2),
+                     "lead_time_days": lt, "days_cover": round(days_cover, 1),
+                     "position": pos},
+                    action,
+                ))
+            elif lt_need > 0 and on_hand > lt_need * 2.5:
+                # ---- 過剰在庫（在庫がリードタイム需要の2.5倍超 → 滞留） ----
+                sev = "medium" if segment[0] == "A" else "low"
+                action = "滞留確認・仕入調整・値引き（過剰在庫）"
+                out.append(AnomalyResult(
+                    product_id, place_id, "abnormal_turnover", sev,
+                    {"on_hand": round(on_hand, 2), "lower": round(lt_need, 2),
+                     "upper": round(lt_need * 2.5, 2), "avg_daily": round(avg_daily, 2),
+                     "lead_time_days": lt, "days_cover": round(days_cover, 1),
+                     "position": "overstock"},
+                    action,
                 ))
         return out

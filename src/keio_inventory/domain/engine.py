@@ -53,9 +53,11 @@ def _compute_product_worker(args):
                               forecast_demand=float(sum(fc.p50[:max(1, int(round(lt)))])),
                               safety_stock=ss.safety_stock, on_hand_qty=on_hand)
         recommendations[(pid, plid)] = rec
+        rec_lt = float(sum(fc.p50[:max(1, int(round(lt)))]))
         for an in anomaly.run(pid, plid, hist,
                               on_hand=on_hand if has_inventory else None,
-                              annual_turnover=None, days_on_hand=None, segment=seg_str):
+                              annual_turnover=None, days_on_hand=None, segment=seg_str,
+                              lead_time_days=lt, forecast_demand=rec_lt):
             alerts.append({'product_id': pid, 'product_name': name, 'place_id': plid,
                            'anomaly_type': an.anomaly_type, 'severity': an.severity,
                            'detail': an.detail, 'recommended_action': an.recommended_action})
@@ -209,12 +211,15 @@ class InventoryEngine:
                 self.recommendations[(pid, plid)] = rec
 
                 # 異常検知
+                rec_lt = float(sum(fc.p50[:max(1, int(round(lt)))]))
                 for an in self.anomaly.run(
                     pid, plid, hist,
                     on_hand=on_hand if self.has_inventory else None,
                     annual_turnover=None,
                     days_on_hand=None,
                     segment=seg_str,
+                    lead_time_days=lt,
+                    forecast_demand=rec_lt,
                 ):
                     self._alert_seq += 1
                     self.alerts.append({

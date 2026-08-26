@@ -355,7 +355,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
   <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>在庫最適化 ダッシュボード</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
 async function doImport(){
   const t = document.getElementById('imp-type').value;
   const f = document.getElementById('imp-file').files[0];
@@ -375,9 +376,53 @@ async function doImport(){
     }
   }catch(e){ out.textContent = '通信エラー: ' + e; }
 }
+// CSVフォーマット説明をタイプに応じて表示（実務者が迷わないように）
+var IMP_FMT = {
+  pos: {
+    name:'POS（販売実績）',
+    cols:['sales_date','product_id','place_id','qty_sold','amount'],
+    sample:['2026-08-25,1,1,12,3840','2026-08-25,1,2,9,2880']
+  },
+  purchase: {
+    name:'仕入実績',
+    cols:['po_date','product_id','place_id','order_qty','received_qty','expected_date'],
+    sample:['2026-08-25,1,1,120,120,2026-08-27','2026-08-25,2,1,60,60,2026-08-27']
+  },
+  inventory: {
+    name:'在庫実績',
+    cols:['inventory_date','product_id','place_id','on_hand_qty','allocated_qty','available_qty'],
+    sample:['2026-08-25,1,1,40,5,35','2026-08-25,2,1,120,0,120']
+  }
+};
+function renderImpHelp(){
+  var el = document.getElementById('imp-help');
+  if(!el) return;
+  var t = (document.getElementById('imp-type')||{}).value || 'pos';
+  var fmt = IMP_FMT[t] || IMP_FMT.pos;
+  var sampleRows = (Array.isArray(fmt.sample) ? fmt.sample : []).map(function(rw){
+    return '<div style="font-family:monospace;color:#9fb0cc">'+rw.replace(/,/g,'<span style="color:var(--muted)">,</span>')+'</div>';
+  }).join('');
+  el.innerHTML =
+    '<div style="margin-bottom:6px"><b style="color:var(--txt)">'+fmt.name+'</b>　列: <span style="font-family:monospace">'+fmt.cols.join(', ')+'</span></div>' +
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">〔サンプル 2行目以降〕</div>' + sampleRows +
+    '<div style="margin-top:6px;font-size:11px;color:var(--muted)">※ 日付は YYYY-MM-DD・product_id/place_id は商品/店舗の番号。右クリックなどで <b>テンプレート.csv</b> を作って利用してください。</div>';
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var it = document.getElementById('imp-type');
+  if(it) it.addEventListener('change', renderImpHelp);
+  renderImpHelp();
+});
 </script>
 <style>
-:root{--bg:#0a1018;--card:#141c2e;--line:#2a3a5e;--txt:#eef2f8;--muted:#9fb0cc;--navy:#1b2a4a;--pink:#ec008c;--pink-light:#ff6cff;--pink-soft:#ff9ecb}
+:root{--bg:#0a1018;--card:#141c2e;--line:#2a3a5e;--txt:#eef2f8;--muted:#9fb0cc;--navy:#1b2a4a;--pink:#ec008c;--pink-light:#ff6cff;--pink-soft:#ff9ecb;
+  /* 統一 意味論パレット: 危険度ランク(赤>橙>黄>グレー) ・ 成功/承認=緑 ・ 調整=青 ・ 未処理=橙 */
+  --sev-critical:#ef4444;--sev-high:#f97316;--sev-mid:#eab308;--sev-low:#9fb0cc;
+  --ok:#22c55e;--ok-deep:#166534;
+  --pending:#f59e0b;
+  --reject:#ef4444;--reject-deep:#b91c1c;
+  --approve:#22c55e;--approve-deep:#166534;
+  --adjust:#3b82f6;--adjust-deep:#1d4ed8;
+  --risk-del:#ef4444;--risk-warn:#f97316;--risk-ok:#16a34a}
 *{box-sizing:border-box;margin:0;padding:0}
 /* 縦スクロールバー領域を常時確保する。タブでページ高さが短いと縦スクロールバーが消えて
    コンテンツ幅が変わり（=縦スクロールバーの幅分）、タブ切替が横にずれて見える問題を防ぐ。
@@ -408,7 +453,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
 th{color:var(--muted);font-weight:500}
 .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px}
-.pill.open{background:#dc2626;color:#fff}.pill.pending{background:#d97706;color:#fff}.pill.ok{background:#16a34a;color:#fff}
+.pill.open{background:var(--sev-critical);color:#fff}.pill.pending{background:var(--pending);color:#fff}.pill.ok{background:var(--ok);color:#fff}
 .status-summary{display:inline-flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 #tab-rec tbody tr{height:44px}
 #tab-rec tbody td{height:44px;vertical-align:middle}
@@ -416,9 +461,9 @@ th{color:var(--muted);font-weight:500}
 .kpi-mini .card{padding:10px 12px}
 .kpi-mini .card .value{font-size:20px}
 .kbadge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;margin-left:3px;vertical-align:middle}
-.kbadge.good{background:#16a34a;color:#fff}
-.kbadge.warn{background:#eab308;color:#1a1a1a}
-.kbadge.bad{background:#dc2626;color:#fff}
+.kbadge.good{background:var(--ok);color:#fff}
+.kbadge.warn{background:var(--sev-mid);color:#1a1a1a}
+.kbadge.bad{background:var(--sev-critical);color:#fff}
 /* ---- KPIバッジ カスタムツールチップ ---- */
 .kbadge{cursor:help;position:relative}
 /* ツールチップはバッジの右側に表示（ページ上端で見切れないよう横方向にする） */
@@ -433,9 +478,9 @@ th{color:var(--muted);font-weight:500}
 /* 右端のカードで右にはみ出す場合は、バッジの下（horizontal）ではなく左側に開く画面端グリッド用の安全針 */
 @media (max-width:900px){ .kbadge .tip{left:auto;right:calc(100% + 8px);transform:translateY(-50%)} .kbadge .tip::before{right:auto;left:100%;border-right-color:transparent;border-left-color:#2a3a5e} }
 .detail-compare{color:var(--muted) !important;font-size:11px;margin-top:2px;line-height:1.4}
-.detail-compare .cmp-ok{color:#16a34a;font-weight:600}
-.detail-compare .cmp-warn{color:#eab308;font-weight:600}
-.detail-compare .cmp-bad{color:#dc2626;font-weight:600}
+.detail-compare .cmp-ok{color:var(--ok);font-weight:600}
+.detail-compare .cmp-warn{color:var(--sev-mid);font-weight:600}
+.detail-compare .cmp-bad{color:var(--sev-critical);font-weight:600}
 /* ---- アラート詳細 モーダル ---- */
 #alert-overlay{display:none;position:fixed;inset:0;background:rgba(5,9,16,.62);z-index:998;backdrop-filter:blur(2px)}
 #alert-detail,#exclusion-detail{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -451,9 +496,9 @@ th{color:var(--muted);font-weight:500}
 .tab-btn{background:transparent;border:none;color:var(--muted);padding:8px 16px;font-size:14px;cursor:pointer;border-bottom:2px solid transparent}
 .tab-btn.active{color:var(--pink);border-bottom:2px solid var(--pink);font-weight:600}
 button.act-btn{background:#141c2e;color:#eef2f8;border:1px solid #2a3a5e;padding:3px 10px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px}
-button.act-btn.approve{background:#0f5132;border-color:#198754;color:#fff}
-button.act-btn.reject{background:#842029;border-color:#dc3545;color:#fff}
-button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
+button.act-btn.approve{background:var(--approve-deep);border-color:var(--approve);color:#fff}
+button.act-btn.reject{background:var(--reject-deep);border-color:var(--reject);color:#fff}
+button.act-btn.adjust{background:var(--adjust-deep);border-color:var(--adjust);color:#fff}
 /* 調整発注量 ポップ（モーダル） */
 #adjust-overlay{display:none;position:fixed;inset:0;background:rgba(5,9,16,.62);z-index:998}
 #adjust-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -517,6 +562,7 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
   <button class="tab-btn" id="wstab-analysis" onclick="switchWorkspace('analysis',this)">🔍 分析</button>
   <button class="tab-btn" id="wstab-graph" onclick="switchWorkspace('graph',this)">📈 グラフ</button>
   <button class="tab-btn" id="wstab-import" onclick="switchWorkspace('import',this)">📥 取込</button>
+  <button class="tab-btn" id="wstab-guide" onclick="switchWorkspace('guide',this)">📘 見方</button>
 </div>
 <div class="ws-body">
   <div id="ws-list" class="ws-pane">
@@ -550,7 +596,7 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
       <span id="rec-status-summary" class="status-summary"></span>
     </div>
     <div style="max-height:320px;overflow-y:auto"><table style="width:100%"><thead id="rec-thead"><tr>
-      <th>商品</th><th>店舗</th><th>ABC/XYZ</th><th>在庫</th><th>需要予測</th><th>安全在庫</th><th>推奨発注量</th><th>状態</th><th>操作</th>
+      <th>商品</th><th>店舗</th><th>ABC/XYZ<br><span style="font-weight:400;font-size:10px;color:var(--muted)">売上×安定性</span></th><th>在庫<br><span style="font-weight:400;font-size:10px;color:var(--muted)">現在数</span></th><th>需要予測<br><span style="font-weight:400;font-size:10px;color:var(--muted)">発注～入荷分(約7日)</span></th><th>安全在庫<br><span style="font-weight:400;font-size:10px;color:var(--muted)">遅れ保険</span></th><th>推奨発注量<br><span style="font-weight:400;font-size:10px;color:var(--muted)">今回入荷する数</span></th><th>状態</th><th>操作</th>
     </tr></thead><tbody id="rec-tbody"></tbody></table></div>
   </div>
 
@@ -568,10 +614,20 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
     </div>
     <div style="max-height:320px;overflow-y:auto"><table style="width:100%"><thead><tr><th>商品</th><th>店舗</th><th>種別</th><th>重警度</th><th>検知日</th><th>状態</th><th>操作</th></tr></thead><tbody id="alert-tbody"></tbody></table></div>
     <div id="al-summary" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
-    <!-- アラート詳細 モーダル（商品リストの上に被せる。背景グレーアウト付き） -->
+  </div>
+
+  <!-- 販売不振タブ -->
+  <div id="tab-exclusion" class="tab-body" style="display:none">
+    <div style="max-height:320px;overflow-y:auto"><table style="width:100%"><thead><tr><th>商品</th><th>店舗</th><th>ABC/XYZ</th><th>販売数</th><th>在庫</th><th>スコア(/100)</th><th>リスク</th></tr></thead><tbody id="exclusion-tbody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- フルスクリーンモーダル群（タブ構造外・body直下相当。display:none のタブ内にあると position:fixed でも表示されないため外に配置） -->
+<!-- アラート詳細 モーダル（背景グレーアウト付き） -->
 <div id="alert-overlay" onclick="alClose()"></div>
 <div id="alert-detail" role="dialog" aria-modal="true"></div>
-
+<!-- 販売不振詳細 モーダル（#alert-overlay 共用） -->
+<div id="exclusion-detail" role="dialog" aria-modal="true"></div>
 <!-- 推奨発注 調整 モーダル（発注量の数値調整） -->
 <div id="adjust-overlay" onclick="closeAdjustModal()"></div>
 <div id="adjust-modal" role="dialog" aria-modal="true">
@@ -584,15 +640,6 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
   <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
     <button class="act-btn" onclick="closeAdjustModal()">キャンセル</button>
     <button class="act-btn adjust" onclick="submitAdjust()">調整する</button>
-  </div>
-</div>
-  </div>
-
-  <!-- 販売不振タブ -->
-  <div id="tab-exclusion" class="tab-body" style="display:none">
-    <div style="max-height:320px;overflow-y:auto"><table style="width:100%"><thead><tr><th>商品</th><th>店舗</th><th>ABC/XYZ</th><th>販売数</th><th>在庫</th><th>スコア(/100)</th><th>リスク</th></tr></thead><tbody id="exclusion-tbody"></tbody></table></div>
-    <!-- 販売不振詳細 モーダル（アラートと同様・#alert-overlay 共用） -->
-    <div id="exclusion-detail" role="dialog" aria-modal="true"></div>
   </div>
 </div>
 
@@ -611,7 +658,7 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
 
 <div id="a-tab-matrix">
 <div class="panel" style="margin-bottom:14px"><h2>ABC-XYZ 管理方針マトリクス</h2>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">ABC=売上貢献度 / XYZ=需要安定性(CV)・各セル=商品数・売上比・管理方針。セルをクリックで商品ドリルへ</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">ABC=売上貢献度(直近90日) / XYZ=需要の安定性・縦A=売れ筋→C=売れ筋でない ・横X=安定→Z=不安定。セル=商品数・売上比・管理方針。セルをクリックで商品ドリルへ</div>
   <div style="overflow-x:auto"><table style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:6px;font-size:12px">
     <thead><tr>
       <th style="color:var(--muted);font-weight:500;text-align:left;white-space:nowrap;font-size:10px">縦=ABC(売上)<br>横=XYZ</th>
@@ -669,7 +716,7 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
       </div>
       <div class="chartWrap" style="height:400px"><canvas id="chart-history"></canvas></div>
       <div style="max-height:180px;overflow-y:auto;margin-top:6px"><table style="width:100%"><thead><tr>
-        <th>期間</th><th>日数</th><th>適正在庫量(平均)</th><th>安全在庫(平均)</th><th>回転率(年近似)</th>
+        <th>期間</th><th>日数</th><th>適正在庫量(平均)</th><th>安全在庫(平均)</th><th>回転率(年近似)<br><span style="font-weight:400;font-size:10px;color:var(--muted)">期間ごとの参考値</span></th>
       </tr></thead><tbody id="history-table"></tbody></table></div>
     </div>
     <div id="g-tab-fc" style="display:none">
@@ -698,8 +745,53 @@ button.act-btn.adjust{background:#0d47a1;border-color:#1976d2;color:#fff}
   </div>
   <div id="imp-result" style="margin-top:10px;font-size:12px;color:var(--muted);white-space:pre-wrap"></div>
 </div>
+<div class="panel" style="margin-top:10px">
+  <h2 style="font-size:14px">📐 CSVの書き方（テンプレート）</h2>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:8px">1行目に列名、2行目以降にデータを書きます。列名は下記の見出しをそのまま使ってください（別名も可・順不同・欠落不可）。</div>
+  <div id="imp-help" style="font-size:12px;color:var(--muted)"></div>
+</div>
 
+</div>
+<div id="ws-guide" class="ws-pane" style="display:none">
+<div class="panel" style="margin-bottom:14px">
+  <h2>📘 この画面の見方（はじめての方へ）</h2>
+  <div style="font-size:12px;color:var(--muted);line-height:1.9">
+    このダッシュボードは、<b>「どの商品をどれだけ仕入れれば、欠品も過剰在庫も防げるか」</b>を、
+    販売（POS）と在庫のデータから毎日自動でおすすめしてくれる画面です。<br>
+    専門用語は次のように読み替えてください。
   </div>
+</div>
+<div class="panel" style="margin-bottom:14px">
+  <h2 style="font-size:15px">📗 左下のKPIカードの読み方</h2>
+  <table style="width:100%;font-size:13px">
+    <tr><th style="width:130px">項目</th><th>意味（読み方）</th><th>この数字を見てどうするか</th></tr>
+    <tr><td><b>適正在庫量</b></td><td>今どれだけ在庫があれば売上を逃さないか（目安の理想量）</td><td>現在の在庫がこの数字を大きく下回るなら、欠品に備えて補充します</td></tr>
+    <tr><td><b>在庫回転率</b></td><td>在庫が1年で何回入れ替わるか（売れて回っているか）</td><td>低い=売れ残って在庫が溜まる。<b>高い=売れて在庫が足りず欠品しやすい</b>。10〜120回が目安</td></tr>
+    <tr><td><b>安全在庫</b></td><td>急な売れ行きや納品遅れに備えて確保しておく「保険の在庫」</td><td>5日分以上が目安。少ないと予期せぬ欠品が起きます</td></tr>
+    <tr><td><b>推奨発注量</b></td><td>「今回、いくら仕入れれば良いか」のおすすめ数量</td><td>承認して発注に反映するのが基本です</td></tr>
+    <tr><td><b>未対応アラート</b></td><td>今すぐ対応が必要な異常の数（在庫不足・過剰など）</td><td>数が多いほど、早めに確認・対応が必要です</td></tr>
+  </table>
+</div>
+<div class="panel" style="margin-bottom:14px">
+  <h2 style="font-size:15px">📗 商品別リストの列の読み方</h2>
+  <table style="width:100%;font-size:13px">
+    <tr><th style="width:130px">列</th><th>意味（読み方）</th></tr>
+    <tr><td><b>ABC/XYZ</b></td><td>その商品の重要性を示す印。A=売れ筋、B=普通、C=売れていない。X=需要が安定、Y=変動、Z=不安定。例: <b>AX</b>=売れ筋で安定（最重要）、<b>CZ</b>=売れず不安定（処分検討）</td></tr>
+    <tr><td><b>在庫</b></td><td>今、店舗に置いてある数（現在数）</td></tr>
+    <tr><td><b>需要予測</b></td><td>発注してから届くまで（約7日間）に売れると見込む数</td></tr>
+    <tr><td><b>安全在庫</b></td><td>売上や納期のズレに備える保険の数</td></tr>
+    <tr><td><b>推奨発注量</b></td><td>今回仕入れるべきおすすめの数（<b>需要予測＋安全在庫－在庫</b>）</td></tr>
+    <tr><td><b>状態</b></td><td>発注のおすすめの進み具合（未処理=まだ / 承認済=OK / 調整済=数値を変えた / 却下=キャンセル）</td></tr>
+  </table>
+</div>
+<div class="panel">
+  <h2 style="font-size:15px">📗 アラート「在庫不足・過剰在庫」の読み方</h2>
+  <div style="font-size:12px;color:var(--muted);line-height:1.9">
+    <b>在庫不足</b>＝今の在庫では、発注して届くまでの分が足りません。<b>補充発注を最優先</b>で検討してください。<br>
+    <b>過剰在庫</b>＝売れ行きに比べて在庫を持ちすぎています。<b>値引き・仕入調整</b>で滞留を解消するのがおすすめです。<br>
+    どの商品を先にすべきか＝「緊急・高」のものほど優先度が高い印です。
+  </div>
+</div>
 </div>
 <script>
 // ==== 右上 時計（リアルタイム更新） ====
@@ -722,7 +814,7 @@ setInterval(updateClock, 1000);
 // ワークスペースタブ切替
 // 仕様: タブを切り替えるたびにページ先頭に戻る（シンプルで一貫性のある挙動。高さがタブで異なるので位置維持はしない）
 function switchWorkspace(name, btn){
-  ['list','analysis','graph','import'].forEach(function(k){
+  ['list','analysis','graph','import','guide'].forEach(function(k){
     var p = document.getElementById('ws-' + k);
     var b = document.getElementById('wstab-' + k);
     if(p){ p.style.display = (k===name) ? '' : 'none'; }
@@ -742,7 +834,7 @@ var SEG_POLICY = {
   BX:{policy:'標準管理',lvl:'med'}, BY:{policy:'標準+フォロー',lvl:'med'}, BZ:{policy:'在庫過剰注意',lvl:'med'},
   CX:{policy:'自動発注(KANBAN風)',lvl:'low'}, CY:{policy:'撤退検討対象',lvl:'low'}, CZ:{policy:'撤退・限定販売',lvl:'low'}
 };
-function segColor(lvl){ return lvl==='high' ? '#dc2626' : (lvl==='med' ? '#d97706' : '#166534'); }
+function segColor(lvl){ return lvl==='high' ? '#ef4444' : (lvl==='med' ? '#f97316' : '#16a34a'); }
 function setSegNote(n){ var el=document.getElementById('seg-matrix-note'); if(el) el.textContent=n; }
 async function renderSegMatrix(){
   var body = document.getElementById('seg-matrix-body');
@@ -773,7 +865,7 @@ async function renderSegMatrix(){
       html += '</tr>';
     });
     body.innerHTML = html;
-    setSegNote('合計 '+total.toLocaleString()+' 円／'+j.items.length+'商品　·　赤=高優先・橙=中・緑=自動化/撤退。セルをクリックで商品一覧へ');
+    setSegNote('直近90日間 合計売上 '+total.toLocaleString()+' 円／'+j.items.length+'商品　·　赤=高優先・橙=中・緑=自動化/撤退。セルをクリックで商品一覧へ');
   }catch(e){ body.innerHTML=''; setSegNote('ABC-XYZ取得エラー: '+e); }
 }
 function drillSegCell(cell){ var seg=cell.getAttribute('data-seg'); if(seg) drillSegment(seg); }
@@ -805,7 +897,7 @@ async function load(){
     set('k-target', (d.inventory.target_inventory_total!=null? Math.round(Number(d.inventory.target_inventory_total)).toLocaleString() : '-'));
     set('k-turnover', d.inventory.inventory_turnover_annual != null ? Number(d.inventory.inventory_turnover_annual).toLocaleString() : '-');
     set('k-safety', Math.round(Number(d.inventory.safety_stock_total)).toLocaleString());
-    set('k-mode', 'mode: ' + d.inventory.mode + (d.inventory.service_level!=null?' / SL='+d.inventory.service_level:''));
+    set('k-mode', '需要に対する安全余裕（バッファ日数）で安全性を評価');
     set('k-order', Math.round(Number(d.order.order_quantity_total)).toLocaleString());
     set('k-order-count', d.order.order_count + ' 件 / ' + d.order.recommendation_items + ' 品目' + (d.order.pending?' (未処理 '+d.order.pending+')':''));
     set('k-alert', d.anomaly.open_alerts);
@@ -833,7 +925,7 @@ async function load(){
         : '在庫充填率 '+fill.toFixed(0)+'% と適正(100%)を下回っています。<br><b>欠品リスク</b>の可能性があります。<br><b>推奨発注量を確認し、補充を優先</b>してください。'));
     setKpiCompare('k-target-meta',
       ['在庫充填率', fill.toFixed(0)+'%', '100%', fill>=90?'ok':(fill>=60?'warn':'bad')],
-      '在庫(推計) ' + Math.round(stock).toLocaleString() + ' / 適正 ' + Math.round(inj).toLocaleString());
+      '現在の在庫量 ' + Math.round(stock).toLocaleString() + ' ／ 適正在庫 ' + Math.round(inj).toLocaleString() + '（在庫を適正まで ' + Math.round(Math.max(0, recq)).toLocaleString() + ' 補充）');
     // ---- 在庫回転率：高すぎ(欠品危険)・低すぎ(滞留) ----
     var turnLv = (turnover>=10 && turnover<=120) ? 'good' : (turnover>=5 ? 'warn' : 'bad');
     setKpiBadge('k-turnover-badge', turnLv,
@@ -845,7 +937,7 @@ async function load(){
                                      : '回転率が適正域の境界付近です。<br><b>推移を注視</b>してください。'))));
     setKpiCompare('k-turnover-meta',
       ['回転率(年)', turnover.toFixed(1)+'回', '10〜120回', turnLv],
-      '在庫の回転速度（年間何回入れ替わるか）');
+      '在庫が1年で何回入れ替わるか。低い回数=売れ残って在庫が溜まる傾向、高い回数=売れて在庫が回りきっていない（欠品しやすい）');
     // ---- 安全在庫：需要に対するバッファ日数 ----
     var bufDays = dem>0 ? (ss/dem) : 7;
     var bufLv = bufDays>=5 ? 'good' : (bufDays>=3 ? 'warn' : 'bad');
@@ -930,7 +1022,31 @@ var SEV_ORDER = {critical:0, high:1, medium:2, low:3};
 var SEV_LABEL = {critical:'緊急 即対応', high:'高 高優先', medium:'中 中優先', low:'低 確認'};
 var SEV_JP = {critical:'緊急', high:'高', medium:'中', low:'低'};
 var SEV_MEANING = {critical:'追加発注・在庫確保（欠品リスク）', high:'撤退検討・販売見直し', medium:'在庫削減・需要調査', low:'棚卸・運用点検'};
-var ANOM_JP = {slow_mover:'長期滞留', demand_spike:'需要急上昇', demand_drop:'需要急落', abnormal_turnover:'異常回転率'};
+var ANOM_JP = {slow_mover:'長期滞留', demand_spike:'需要急上昇', demand_drop:'需要急落', abnormal_turnover:'在庫異常'};
+// 種別名を実務向け日本語に解決。abnormal_turnover は在庫不足/過剰をdetail.positionで区別して表示
+function anomalyTypeJp(type, detail){
+  if(type === 'abnormal_turnover'){
+    var pos = detail && detail.position;
+    if(pos === 'stockout') return '在庫不足';
+    if(pos === 'overstock') return '過剰在庫';
+    return '在庫異常';
+  }
+  return ANOM_JP[type] || type;
+}
+// ABC/XYZ セグメント記号（AX等）を平易な日本語説明に変換し、ツールチップに使う
+var ABC_JP = {A:'売上上位（売れ筋）', B:'売上中位', C:'売上下位（売れ筋でない）'};
+var XYZ_JP = {X:'需要が安定', Y:'需要に変動あり', Z:'需要が不安定'};
+var SEG_POLICY = {
+  'AX':'重点管理・予測を主に', 'AY':'売上高・要監視', 'AZ':'高売上だが不安定・密に監視',
+  'BX':'標準管理', 'BY':'標準管理＋フォロー', 'BZ':'要注意・仕入調整',
+  'CX':'自動発注（安定的に少量）', 'CY':'撤退検討', 'CZ':'早めに撤退/処分検討'
+};
+function segExplain(seg){
+  if(!seg || seg.length<2) return '分類なし';
+  var a = seg[0], x = seg[1];
+  var p = SEG_POLICY[seg] || '';
+  return (ABC_JP[a]||a) + ' ＋ ' + (XYZ_JP[x]||x) + (p ? '。' + p : '');
+}
 // 異常アラート対応優先度の折りたたみ制御
 function toggleAlertPriority(){
   var body = document.getElementById('alert-pri-body');
@@ -950,12 +1066,20 @@ async function renderAnomPriority(){
     var all = j.items||[];
     var open = all.filter(function(a){ return a.status === 'open'; });
     var items = open.slice().sort(function(a,b){ return (SEV_ORDER[a.severity]||9) - (SEV_ORDER[b.severity]||9); });
-    if(!items.length){ body.innerHTML = '<tr><td colspan=6 style="color:#34d399;text-align:center">未対応アラートは 0件</td></tr>'; summ.textContent = '未対応アラート: 0件'; return; }
+    if(!items.length){ body.innerHTML = '<tr><td colspan=6 style="color:#22c55e;text-align:center">未対応アラートは 0件</td></tr>'; summ.textContent = '未対応アラート: 0件'; return; }
     body.innerHTML = items.map(function(a){
       var sc = sevColor[a.severity]||'#9fb0cc';
-      var tip = SEV_MEANING[a.severity]||'';
       var label = (SEV_LABEL[a.severity]||a.severity);
-      var jp = (ANOM_JP[a.anomaly_type]||a.anomaly_type);
+      var jp = anomalyTypeJp(a.anomaly_type, a.detail);
+      // 説明は「重大度の固定文言」ではなく、このアラートの実態（在庫不足/過剰/種別）に合わせて出す
+      var pos = (a.detail && a.detail.position);
+      var tip =
+        (a.anomaly_type==='demand_spike') ? '売上げ急増で欠品リスク。<br>追加発注・在庫確保を最優先。'
+        : (a.anomaly_type==='demand_drop') ? '売上げ急減。<br>需要減の原因調査・販促見直しを検討。'
+        : (a.anomaly_type==='slow_mover') ? '売れ残り・在庫滞留。<br>在庫削減や値引きを検討。'
+        : (pos==='stockout') ? '在庫不足。<br>補充発注を最優先してください。'
+        : (pos==='overstock') ? '在庫過剰。<br>値引き・仕入調整で滞留を解消。'
+        : (SEV_MEANING[a.severity]||'');
       return '<tr style="border-left:4px solid '+sc+'"><td><b style="color:'+sc+'">'+label+'</b><br><span style="color:var(--muted);font-size:11px">'+tip+'</span></td>'+
         '<td>'+jp+'</td>'+
         '<td>'+a.product_name+'</td><td>'+(a.place_name||('店舗'+a.place_id))+'</td>'+
@@ -1118,7 +1242,7 @@ async function loadRecs(){
       html += '<tr data-place="'+place+'" style="min-height:44px;'+grpBg.slice(grpBg?grpBg.indexOf('background'):-1)+'">' +
         '<td><b>' + it.product_name + '</b></td>' +
         '<td>' + place + '</td>' +
-        '<td>' + seg + '</td>' +
+        '<td title="' + segExplain(seg) + '" style="cursor:help;border-bottom:1px dashed var(--line)">' + seg + '</td>' +
         '<td>' + invTxt + '</td>' +
         '<td>' + Math.round(Number(it.forecast_demand)).toLocaleString() + '</td>' +
         '<td>' + Math.round(Number(it.safety_stock)).toLocaleString() + '</td>' +
@@ -1266,11 +1390,11 @@ async function loadAlerts(){
       return;
     }
     tb.innerHTML = items.map(function(a){
-      const btn = a.status==='open' ? '<button class="act-btn" onclick="ackAlert('+a.id+')">対応中</button> ' : '';
+      const btn = a.status==='open' ? '<button class="act-btn approve" onclick="ackAlert('+a.id+')">対応</button> ' : '';
       const done = a.status!=='done' ? '<button class="act-btn reject" onclick="resolveAlert('+a.id+')">解決</button>' : '';
       var apn = a.place_name || ('店舗'+a.place_id);
       var sc = SEV_COLOR[a.severity] || '#9fb0cc';
-      var jp = ANOM_JP_T[a.anomaly_type] || a.anomaly_type;
+      var jp = anomalyTypeJp(a.anomaly_type, a.detail);
       // 状態を日本語表示（open=未対応 / ack=対応中 / done=解決済み）
       var ST_JP = {open:'未対応', ack:'対応中', done:'解決済み'};
       var stTxt = ST_JP[a.status] || a.status;
@@ -1292,7 +1416,7 @@ async function showAlertDetail(id){
     const r = await fetch('/api/v1/anomaly/alerts/' + id);
     const a = await r.json();
     // 重大度・種別の日本語表記
-    var jp = ANOM_JP2[a.anomaly_type] || a.anomaly_type;
+    var jp = anomalyTypeJp(a.anomaly_type, a.detail);
     var sev = a.severity || 'low';
     var sevLabel = SEV_LABEL[sev] || sev;
     var sevColor = {critical:'#ef4444', high:'#f97316', medium:'#eab308', low:'#9fb0cc'}[sev] || '#9fb0cc';
@@ -1311,12 +1435,25 @@ async function showAlertDetail(id){
     } else {
       reason = jp + 'として検知（' + a.detected_at + '）';
     }
-    // 直近需要サマリ
+    // 直近需要サマリ（日付付き + 前日比トレンド。実務で「増加/減少傾向か」を読めるように）
     var demand = a.recent_demand || [];
     var dq = demand.map(function(x){return Number(x.qty).toFixed(0)}).join(' → ');
-    var demandHint = demand.length>0 ? demand.slice(-7).map(function(x){return Number(x.qty).toFixed(0)}).join(', ') : '-';
+    var recent7 = demand.slice(-7);
+    var demandHint = '-';
+    if(recent7.length){
+      demandHint = recent7.map(function(x){ return x.date.slice(5) + ':' + Number(x.qty).toFixed(0); }).join('　');
+      // 最新3日 と その前3日の平均で増減傾向を判定
+      if(recent7.length >= 6){
+        var last3 = recent7.slice(-3).reduce(function(s,x){return s+Number(x.qty);},0)/3;
+        var prev3 = recent7.slice(-6,-3).reduce(function(s,x){return s+Number(x.qty);},0)/3;
+        var delta = last3 - prev3;
+        demandHint += '<br><span style="color:var(--muted);font-size:11px">傾向: ' +
+          (delta > 0.01 ? '<b style="color:#ef4444">増加中 &#9650;</b>' : (delta < -0.01 ? '<b style="color:#3b82f6">減少中 &#9660;</b>' : '<b style="color:#9fb0cc">横ばい &#9654;</b>')) +
+          '（直近3日平均 ' + last3.toFixed(0) + ' vs その前 ' + prev3.toFixed(0) + '）</span>';
+      }
+    }
     var btn = '';
-    if(a.status === 'open'){ btn = '<button class="act-btn approve" onclick="ackAlert('+a.id+')">対応中にする</button> <button class="act-btn reject" onclick="resolveAlert('+a.id+')">解決にする</button>'; }
+    if(a.status === 'open'){ btn = '<button class="act-btn approve" onclick="ackAlert('+a.id+')">対応にする</button> <button class="act-btn reject" onclick="resolveAlert('+a.id+')">解決にする</button>'; }
     else if(a.status === 'ack'){ btn = '<button class="act-btn approve" onclick="resolveAlert('+a.id+')">解決にする</button>'; }
     // 店舗・SKUによる差別化（同じ商品名でもどの店舗のアラートか区別できるよう見出しに表示）
     var pn = a.place_name || ('店舗' + a.place_id);
